@@ -2,7 +2,7 @@
 
 CumulusMQ is a cloud-native message queue that offers persistent storage capabilities by seamlessly integrating with AWS S3 and Cloudflare R2 object storage services. It is designed to handle large volumes of messages with high throughput, ensuring reliable delivery and durability.
 
-<h3><CURRENTLY WIP, MAY INTRODUCE BREAKING CHANGES.</h3>
+<h3>CURRENTLY WIP [[MAY INTRODUCE BREAKING CHANGES.]]</h3>
 
 Features
 
