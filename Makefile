@@ -1,12 +1,14 @@
-dev:
-	cmake --build build
-	make run
+BUILD_DIR = build
+EXECUTABLE = CumulusMQ
+
+build_executable:
+	cmake --build $(BUILD_DIR)
 
 clean:
-	rm -rf build
+	rm -rf ${BUILD_DIR}
 
 run:
-	./build/Apop
+	./$(BUILD_DIR)/$(EXECUTABLE)
 
-fix_lsp:
-	cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -B build -S .
+gen_build:
+	cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -B ${BUILD_DIR} -S .
