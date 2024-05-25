@@ -11,8 +11,13 @@ int Memory::Save(std::vector<std::byte> data) {
 };
 
 std::vector<std::byte> Memory::Fetch(int offset) {
+  if (offset < 0) {
+    return std::vector<std::byte>();
+  }
+
   if (offset >= bucket.size()) {
     return std::vector<std::byte>();
   }
+
   return bucket[offset];
 }
