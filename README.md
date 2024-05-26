@@ -12,3 +12,62 @@ Features
 <li> <b>Horizontal Scalability:</b> NimbusQueue can scale horizontally by adding more nodes to the cluster, allowing it to handle increasing message volumes seamlessly.</li>
 <li> <b>Flexible Delivery Guarantees:</b> Choose between at-least-once, at-most-once, or exactly-once delivery semantics based on your application's requirements. </li>
 <li> <b>Pub/Sub and Queue Patterns:</b> Supports both publish/subscribe and traditional queue messaging patterns. </li>
+
+Protocol
+
++---------------+---------------+---------------+---------------+
+|   Message     |    Message    |      Body     |   Message     |
+|    Length     |     Type      |     Length    |     Body      |
++---------------+---------------+---------------+---------------+
+|    4 bytes    |    1 byte     |     4 bytes   |     n bytes   |
++---------------+---------------+---------------+---------------+
+
+
+Message Type Value    Message Type
+------------------    ------------
+0x01                  Subscribe
+0x02                  Unsubscribe
+0x03                  Publish
+0x04                  Retrieve
+
+Subscribe Message Body:
++---------------+
+|   Topic Name  |
+|     Length    |
++---------------+
+|     n bytes   |
++---------------+
+| Topic Name    |
++---------------+
+
+Unsubscribe Message Body:
++---------------+
+|   Topic Name  |
+|     Length    |
++---------------+
+|     n bytes   |
++---------------+
+| Topic Name    |
++---------------+
+
+Publish Message Body:
++---------------+---------------+---------------+
+|   Topic Name  |     Message    |   Message     |
+|     Length    |     Length     |     Body      |
++---------------+---------------+---------------+
+|     n bytes   |     4 bytes    |     n bytes   |
++---------------+---------------+---------------+
+| Topic Name    |                |   Message     |
++---------------+---------------+---------------+
+
+Retrieve Message Body:
++---------------+
+|   Topic Name  |
+|     Length    |
++---------------+
+|     n bytes   |
++---------------+
+| Topic Name    |
++---------------+
+
+
