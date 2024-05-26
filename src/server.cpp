@@ -74,7 +74,7 @@ void Server::die(const char *msg) {
 int32_t Server::handle_connection(int connfd) {
   char rbuf[4 + 4096 + 1];
   errno = 0;
-  int32_t err = read_full(connfd, rbuf, 4);
+  int32_t err = read_exact_from_stream(connfd, rbuf, 4);
   if (err) {
     if (errno == 0) {
       msg("EOF");
@@ -92,7 +92,7 @@ int32_t Server::handle_connection(int connfd) {
   }
 
   // request body
-  err = read_full(connfd, &rbuf[4], len);
+  err = read_exact_from_stream(connfd, &rbuf[4], len);
   if (err) {
     msg("read() error");
     return err;
@@ -108,5 +108,5 @@ int32_t Server::handle_connection(int connfd) {
   len = (uint32_t)strlen(reply);
   memcpy(wbuf, &len, 4);
   memcpy(&wbuf[4], reply, len);
-  return write_all(connfd, wbuf, 4 + len);
+  return write_all_to_stream(connfd, wbuf, 4 + len);
 }
