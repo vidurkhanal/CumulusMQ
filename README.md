@@ -15,9 +15,9 @@ Features
 
 Protocol
 
-| Message Length | Message Type | Body Length | Message Body |  
-|----------------|--------------|-------------|--------------|
-| 4 bytes        | 1 byte       | 4 bytes     | n bytes      |
+| Message Length | Message Type | Topic Length | Message Body | Body Length | Message Body |  
+|----------------|--------------|-------------|---------------|-------------|--------------|
+| 4 bytes        | 1 byte       | 4 bytes     | m bytes       | 4 bytes     | n bytes      | 
 
 
 | Message Type Value | Action      |
