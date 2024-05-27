@@ -100,7 +100,7 @@ int32_t Server::handle_connection(int connfd) {
   /* | 0x03               | Publish     | */
   /* | 0x04               | Retrieve    | */
 
-  char rbuf[4 + 1 + 4 + 4 + 4096];
+  char rbuf[MAX_MESSAGE_SIZE];
   errno = 0;
 
   int ptr = 0;
@@ -118,7 +118,7 @@ int32_t Server::handle_connection(int connfd) {
 
   uint32_t message_length = 0;
   memcpy(&message_length, rbuf, 4);
-  if (message_length > 4096 + 4 + 1 + 4 + 4) {
+  if (message_length > MAX_MESSAGE_SIZE) {
     msg("too long");
     return -1;
   }

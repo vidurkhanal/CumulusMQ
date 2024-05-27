@@ -7,9 +7,10 @@
 #include <netinet/ip.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#define MAXMSG 4096
 
 enum CumulusActions { Subscribe, Unsubscribe, Publish, Retrieve, Unknown };
+
+const int MAX_MESSAGE_SIZE = 5112;
 
 struct ServerConfig {
   int port;
