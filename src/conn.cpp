@@ -10,7 +10,7 @@ void conn_put(std::vector<Conn *> &fd2conn, struct Conn *conn) {
   fd2conn[conn->fd] = conn;
 }
 
-static void fd_set_nb(int fd) {
+void fd_set_nb(int fd) {
   errno = 0;
   int flags = fcntl(fd, F_GETFL, 0);
   if (errno) {

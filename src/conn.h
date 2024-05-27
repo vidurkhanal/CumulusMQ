@@ -12,6 +12,8 @@ enum {
   STATE_END = 2, // mark the connection for deletion
 };
 
+void fd_set_nb(int fd);
+
 struct Conn {
   int fd = -1;
   uint32_t state = 0; // either STATE_REQ or STATE_RES

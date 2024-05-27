@@ -1,4 +1,5 @@
 #include "server.h"
+#include "conn.h"
 #include "ioutils.h"
 #include <arpa/inet.h>
 #include <cassert>
@@ -6,6 +7,7 @@
 #include <errno.h>
 #include <iostream>
 #include <netinet/ip.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +43,138 @@ Server::Server(ServerConfig config) : config_(config) {
   }
 }
 
+static bool try_flush_buffer(Conn::Conn *conn) {
+  ssize_t rv = 0;
+  do {
+    size_t remain = conn->wbuf_size - conn->wbuf_sent;
+    rv = write(conn->fd, &conn->wbuf[conn->wbuf_sent], remain);
+  } while (rv < 0 && errno == EINTR);
+  if (rv < 0 && errno == EAGAIN) {
+    // got EAGAIN, stop.
+    return false;
+  }
+  if (rv < 0) {
+    IOUtils::msg("write() error");
+    conn->state = Conn::STATE_END;
+    return false;
+  }
+  conn->wbuf_sent += (size_t)rv;
+  assert(conn->wbuf_sent <= conn->wbuf_size);
+  if (conn->wbuf_sent == conn->wbuf_size) {
+    // response was fully sent, change state back
+    conn->state = Conn::STATE_REQ;
+    conn->wbuf_sent = 0;
+    conn->wbuf_size = 0;
+    return false;
+  }
+  // still got some data in wbuf, could try to write again
+  return true;
+}
+
+static void state_res(Conn::Conn *conn) {
+  while (try_flush_buffer(conn)) {
+  }
+}
+
+static bool try_one_request(Conn::Conn *conn) {
+  // try to parse a request from the buffer
+  if (conn->rbuf_size < 4) {
+    // not enough data in the buffer. Will retry in the next iteration
+    return false;
+  }
+
+  uint32_t len = 0;
+  memcpy(&len, &conn->rbuf[0], 4);
+  if (len > MAX_MESSAGE_SIZE) {
+    IOUtils::msg("too long");
+    conn->state = Conn::STATE_END;
+    return false;
+  }
+  if (4 + len > conn->rbuf_size) {
+    // not enough data in the buffer. Will retry in the next iteration
+    return false;
+  }
+
+  // got one request, do something with it
+  printf("client says: %.*s\n", len, &conn->rbuf[4]);
+
+  // generating echoing response
+  memcpy(&conn->wbuf[0], &len, 4);
+  memcpy(&conn->wbuf[4], &conn->rbuf[4], len);
+  conn->wbuf_size = 4 + len;
+
+  // remove the request from the buffer.
+  // TODO: frequent memmove is inefficient.
+  // TODO: need better handling for production code.
+  size_t remain = conn->rbuf_size - 4 - len;
+  if (remain) {
+    memmove(conn->rbuf, &conn->rbuf[4 + len], remain);
+  }
+  conn->rbuf_size = remain;
+
+  // change state
+  conn->state = Conn::STATE_RES;
+  state_res(conn);
+
+  // continue the outer loop if the request was fully processed
+  return (conn->state == Conn::STATE_REQ);
+}
+
+static bool try_fill_buffer(Conn::Conn *conn) {
+  // try to fill the buffer
+  assert(conn->rbuf_size < sizeof(conn->rbuf));
+  ssize_t rv = 0;
+  do {
+    size_t cap = sizeof(conn->rbuf) - conn->rbuf_size;
+    rv = read(conn->fd, &conn->rbuf[conn->rbuf_size], cap);
+  } while (rv < 0 && errno == EINTR);
+
+  if (rv < 0 && errno == EAGAIN) {
+    // got EAGAIN, stop.
+    return false;
+  }
+
+  if (rv < 0) {
+    IOUtils::msg("read() error");
+    conn->state = Conn::STATE_END;
+    return false;
+  }
+
+  if (rv == 0) {
+    if (conn->rbuf_size > 0) {
+      IOUtils::msg("unexpected EOF");
+    } else {
+      IOUtils::msg("EOF");
+    }
+    conn->state = Conn::STATE_END;
+    return false;
+  }
+
+  conn->rbuf_size += (size_t)rv;
+  assert(conn->rbuf_size <= sizeof(conn->rbuf));
+
+  // Try to process requests one by one.
+  // Why is there a loop? Please read the explanation of "pipelining".
+  while (try_one_request(conn)) {
+  }
+  return (conn->state == Conn::STATE_REQ);
+}
+
+static void state_req(Conn::Conn *conn) {
+  while (try_fill_buffer(conn)) {
+  };
+}
+
+static void connection_io(Conn::Conn *conn) {
+  if (conn->state == Conn::STATE_REQ) {
+    state_req(conn);
+  } else if (conn->state == Conn::STATE_RES) {
+    state_res(conn);
+  } else {
+    assert(0); // not expected
+  }
+}
+
 void Server::Start() {
   int rv = listen(fd_, SOMAXCONN);
   if (rv) {
@@ -48,22 +182,76 @@ void Server::Start() {
   }
 
   std::cout << "Server started on port " << config_.port << "\n";
+  // a map of all client connections, keyed by fd
+  std::vector<Conn::Conn *> fd2conn;
+
+  // set the listen fd to nonblocking mode
+  Conn::fd_set_nb(fd_);
+
+  std::vector<struct pollfd> poll_args;
+
   while (true) {
-    // accept
-    struct sockaddr_in client_addr = {};
-    socklen_t socklen = sizeof(client_addr);
-    int connfd = accept(fd_, (struct sockaddr *)&client_addr, &socklen);
-    if (connfd < 0) {
-      continue; // error
+    // prepare the arguments of the poll()
+    poll_args.clear();
+    // for convenience, the listening fd is put in the first position
+    struct pollfd pfd = {fd_, POLLIN, 0};
+
+    poll_args.push_back(pfd);
+
+    // connection fds
+    for (Conn::Conn *conn : fd2conn) {
+      if (!conn) {
+        continue;
+      }
+      struct pollfd pfd = {};
+      pfd.fd = conn->fd;
+      pfd.events = (conn->state == Conn::STATE_REQ) ? POLLIN : POLLOUT;
+      pfd.events = pfd.events | POLLERR;
+      poll_args.push_back(pfd);
     }
 
-    while (true) {
-      int32_t err = handle_connection(connfd);
-      if (err) {
-        break;
+    // poll for active fds
+    // the timeout argument doesn't matter here
+    int rv = poll(poll_args.data(), (nfds_t)poll_args.size(), 1000);
+    if (rv < 0) {
+      die("poll");
+    }
+
+    // process active connections
+    for (size_t i = 1; i < poll_args.size(); ++i) {
+      if (poll_args[i].revents) {
+        Conn::Conn *conn = fd2conn[poll_args[i].fd];
+        connection_io(conn);
+        if (conn->state == Conn::STATE_END) {
+          // client closed normally, or something bad happened.
+          // destroy this connection
+          fd2conn[conn->fd] = NULL;
+          (void)close(conn->fd);
+          free(conn);
+        }
       }
     }
-    close(connfd);
+
+    // try to accept a new connection if the listening fd is active
+    if (poll_args[0].revents) {
+      (void)Conn::accept_new_conn(fd2conn, fd_);
+    }
+
+    /* // accept */
+    /* struct sockaddr_in client_addr = {}; */
+    /* socklen_t socklen = sizeof(client_addr); */
+    /* int connfd = accept(fd_, (struct sockaddr *)&client_addr, &socklen); */
+    /* if (connfd < 0) { */
+    /*   continue; // error */
+    /* } */
+    /**/
+    /* while (true) { */
+    /*   int32_t err = handle_connection(connfd); */
+    /*   if (err) { */
+    /*     break; */
+    /*   } */
+    /* } */
+    /* close(connfd); */
   }
 }
 
