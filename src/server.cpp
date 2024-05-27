@@ -12,6 +12,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+namespace Server {
+
 Server::Server(ServerConfig config) : config_(config) {
   fd_ = socket(AF_INET /* says use IPv4*/, SOCK_STREAM /*use TCP*/,
                0 /*use default protocol*/);
@@ -65,24 +67,24 @@ void Server::Start() {
   }
 }
 
-void Server::die(const char *msg) {
+void die(const char *msg) {
   int err = errno;
   fprintf(stderr, "[%d] %s\n", err, msg);
   abort();
 }
 
-static CumulusActions get_action(uint8_t message_type) {
+static Actions get_action(uint8_t message_type) {
   switch (message_type) {
   case 0x01:
-    return Subscribe;
+    return Actions::Subscribe;
   case 0x02:
-    return Unsubscribe;
+    return Actions::Unsubscribe;
   case 0x03:
-    return Publish;
+    return Actions::Publish;
   case 0x04:
-    return Retrieve;
+    return Actions::Retrieve;
   default:
-    return Unknown;
+    return Actions::Unknown;
   }
 }
 
@@ -106,12 +108,12 @@ int32_t Server::handle_connection(int connfd) {
   int ptr = 0;
 
   // Read the Message Length
-  int32_t err = read_exact(connfd, &rbuf[ptr], 4);
+  int32_t err = IOUtils::read_exact(connfd, &rbuf[ptr], 4);
   if (err) {
     if (errno == 0) {
-      msg("EOF");
+      IOUtils::msg("EOF");
     } else {
-      msg("read() error");
+      IOUtils::msg("read() error");
     }
     return err;
   }
@@ -119,25 +121,25 @@ int32_t Server::handle_connection(int connfd) {
   uint32_t message_length = 0;
   memcpy(&message_length, rbuf, 4);
   if (message_length > MAX_MESSAGE_SIZE) {
-    msg("too long");
+    IOUtils::msg("too long");
     return -1;
   }
   printf("Message Length: %u\n", message_length);
 
   // Read and Process the Message Type byte
   ptr += 4;
-  err = read_exact(connfd, &rbuf[ptr], 1);
+  err = IOUtils::read_exact(connfd, &rbuf[ptr], 1);
   if (err) {
-    msg("read() error");
+    IOUtils::msg("read() error");
     return err;
   }
 
   uint8_t message_type = 0;
   memcpy(&message_type, &rbuf[ptr], 1);
 
-  CumulusActions action = get_action(message_type);
-  if (action == Unknown) {
-    msg("unknown action");
+  Actions action = get_action(message_type);
+  if (action == Actions::Unknown) {
+    IOUtils::msg("unknown action");
     return -1;
   }
 
@@ -145,9 +147,9 @@ int32_t Server::handle_connection(int connfd) {
 
   // Read the Topic Length
   ptr += 1;
-  err = read_exact(connfd, &rbuf[ptr], 4);
+  err = IOUtils::read_exact(connfd, &rbuf[ptr], 4);
   if (err) {
-    msg("read() error");
+    IOUtils::msg("read() error");
     return err;
   }
 
@@ -157,9 +159,9 @@ int32_t Server::handle_connection(int connfd) {
 
   // read the topic
   ptr += 4;
-  err = read_exact(connfd, &rbuf[ptr], topic_length);
+  err = IOUtils::read_exact(connfd, &rbuf[ptr], topic_length);
   if (err) {
-    msg("read()");
+    IOUtils::msg("read()");
     return err;
   }
 
@@ -168,25 +170,25 @@ int32_t Server::handle_connection(int connfd) {
 
   // Read the Body Length
   ptr += topic_length;
-  err = read_exact(connfd, &rbuf[ptr], 4);
+  err = IOUtils::read_exact(connfd, &rbuf[ptr], 4);
   if (err) {
-    msg("read() error");
+    IOUtils::msg("read() error");
     return err;
   }
 
   uint32_t body_length = 0;
   memcpy(&body_length, &rbuf[ptr], 4);
   if (message_length > 4096) {
-    msg("too long");
+    IOUtils::msg("too long");
     return -1;
   }
   printf("Body Length: %u\n", body_length);
 
   // read the body
   ptr += 4;
-  err = read_exact(connfd, &rbuf[ptr], body_length);
+  err = IOUtils::read_exact(connfd, &rbuf[ptr], body_length);
   if (err) {
-    msg("read()");
+    IOUtils::msg("read()");
     return err;
   }
 
@@ -202,5 +204,6 @@ int32_t Server::handle_connection(int connfd) {
   message_length = (uint32_t)strlen(reply);
   memcpy(wbuf, &message_length, 4);
   memcpy(&wbuf[4], reply, message_length);
-  return write_all(connfd, wbuf, 4 + message_length);
+  return IOUtils::write_all(connfd, wbuf, 4 + message_length);
 }
+} // namespace Server

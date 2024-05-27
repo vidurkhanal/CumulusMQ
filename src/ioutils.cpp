@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <unistd.h>
 
+namespace IOUtils {
 void msg(const char *msg) { fprintf(stderr, "%s\n", msg); }
 
 int32_t read_exact(int fd, char *buf, size_t n) {
@@ -30,3 +31,4 @@ int32_t write_all(int fd, const char *buf, size_t n) {
   }
   return 0;
 }
+} // namespace IOUtils

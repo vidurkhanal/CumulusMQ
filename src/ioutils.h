@@ -5,6 +5,8 @@
 #include <cstdio>
 #include <unistd.h>
 
+namespace IOUtils {
+
 void msg(const char *msg);
 
 /*
@@ -20,4 +22,5 @@ kernel buffer is full, we must keep trying when the write() returns fewer bytes
 than we need.
 */
 int32_t write_all(int fd, const char *buf, size_t n);
+} // namespace IOUtils
 #endif // !DEBUG
