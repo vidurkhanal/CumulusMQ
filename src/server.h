@@ -9,6 +9,8 @@
 #include <unistd.h>
 #define MAXMSG 4096
 
+enum CumulusActions { Subscribe, Unsubscribe, Publish, Retrieve, Unknown };
+
 struct ServerConfig {
   int port;
   Storage *storage;
