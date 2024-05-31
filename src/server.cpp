@@ -16,6 +16,21 @@
 
 namespace Server {
 
+static Actions get_action(uint8_t message_type) {
+  switch (message_type) {
+  case 0x01:
+    return Actions::Subscribe;
+  case 0x02:
+    return Actions::Unsubscribe;
+  case 0x03:
+    return Actions::Publish;
+  case 0x04:
+    return Actions::Retrieve;
+  default:
+    return Actions::Unknown;
+  }
+}
+
 Server::Server(ServerConfig config) : config_(config) {
   fd_ = socket(AF_INET /* says use IPv4*/, SOCK_STREAM /*use TCP*/,
                0 /*use default protocol*/);
@@ -84,19 +99,57 @@ static bool try_one_request(Conn::Conn *conn) {
   }
 
   uint32_t len = 0;
-  memcpy(&len, &conn->rbuf[0], 4);
+  uint32_t ptr = 0;
+  memcpy(&len, &conn->rbuf[ptr], 4);
   if (len > MAX_MESSAGE_SIZE) {
     IOUtils::msg("too long");
     conn->state = Conn::STATE_END;
     return false;
   }
-  if (4 + len > conn->rbuf_size) {
+
+  printf("Message Length: %u\n", len);
+  ptr += 4;
+
+  if (ptr + len > conn->rbuf_size) {
     // not enough data in the buffer. Will retry in the next iteration
     return false;
   }
 
+  uint8_t message_type = 0;
+  memcpy(&message_type, &conn->rbuf[ptr], 1);
+  Actions action = get_action(message_type);
+  if (action == Actions::Unknown) {
+    IOUtils::msg("unknown action");
+    conn->state = Conn::STATE_END;
+    return false;
+  }
+  ptr += 1;
+  printf("Action: %u\n", action);
+
+  uint32_t topic_length = 0;
+  memcpy(&topic_length, &conn->rbuf[ptr], 4);
+  printf("Topic Length: %u\n", topic_length);
+  ptr += 4;
+
+  char topic_buf[topic_length + 1];
+  memcpy(&topic_buf, &conn->rbuf[ptr], topic_length);
+  topic_buf[topic_length] = '\0';
+  printf("Topic: %s\n", topic_buf);
+  ptr += topic_length;
+
+  uint32_t body_length = 0;
+  memcpy(&body_length, &conn->rbuf[ptr], 4);
+  printf("body Length: %u\n", body_length);
+  ptr += 4;
+
+  char body_buf[body_length + 1];
+  memcpy(&body_buf, &conn->rbuf[ptr], body_length);
+  topic_buf[body_length] = '\0';
+  printf("Body: %s\n", body_buf);
+  ptr += body_length;
+
   // got one request, do something with it
-  printf("client says: %.*s\n", len, &conn->rbuf[4]);
+  /* printf("client says: %.*s\n", len, &conn->rbuf[4]); */
 
   // generating echoing response
   memcpy(&conn->wbuf[0], &len, 4);
@@ -259,21 +312,6 @@ void die(const char *msg) {
   int err = errno;
   fprintf(stderr, "[%d] %s\n", err, msg);
   abort();
-}
-
-static Actions get_action(uint8_t message_type) {
-  switch (message_type) {
-  case 0x01:
-    return Actions::Subscribe;
-  case 0x02:
-    return Actions::Unsubscribe;
-  case 0x03:
-    return Actions::Publish;
-  case 0x04:
-    return Actions::Retrieve;
-  default:
-    return Actions::Unknown;
-  }
 }
 
 int32_t Server::handle_connection(int connfd) {
