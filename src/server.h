@@ -7,6 +7,7 @@
 #include <netinet/ip.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <unordered_map>
 
 namespace Server {
 
@@ -16,7 +17,6 @@ const int MAX_MESSAGE_SIZE = 5112;
 
 struct ServerConfig {
   int port;
-  Storage *storage;
 };
 
 void die(const char *msg);
@@ -29,7 +29,8 @@ public:
 private:
   ServerConfig config_;
   int fd_;
-  static int32_t handle_connection(int connfd);
+  std::unordered_map<std::string, Storage> topic_to_storage_;
+  int32_t handle_connection(int connfd);
 };
 
 } // namespace Server
