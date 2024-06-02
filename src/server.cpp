@@ -1,6 +1,7 @@
 #include "server.h"
 #include "conn.h"
 #include "ioutils.h"
+#include "storage.h"
 #include <arpa/inet.h>
 #include <cassert>
 #include <cstdint>
@@ -31,7 +32,10 @@ static Actions get_action(uint8_t message_type) {
   }
 }
 
-Server::Server(ServerConfig config) : config_(config) {
+Server::Server(ServerConfig config, StorageFactory storage_factory,
+               StorageType storage_type)
+    : config(config), storage_factory(storage_factory),
+      storage_type(storage_type) {
   fd_ = socket(AF_INET /* says use IPv4*/, SOCK_STREAM /*use TCP*/,
                0 /*use default protocol*/);
 
@@ -231,7 +235,7 @@ void Server::Start() {
     die("listen()");
   }
 
-  std::cout << "Server started on port " << config_.port << "\n";
+  std::cout << "Server started on port " << config.port << "\n";
   // a map of all client connections, keyed by fd
   std::vector<Conn::Conn *> fd2conn;
 
