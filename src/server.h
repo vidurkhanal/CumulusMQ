@@ -2,6 +2,7 @@
 #define SERVER_H
 
 #include "storage.h"
+#include "topic.h"
 #include <arpa/inet.h>
 #include <cstdint>
 #include <netinet/ip.h>
@@ -23,13 +24,16 @@ void die(const char *msg);
 
 class Server {
 public:
-  Server(ServerConfig config);
+  Server(ServerConfig config, StorageFactory storage_factory,
+         StorageType storage_type);
   void Start();
 
 private:
-  ServerConfig config_;
+  ServerConfig config;
+  StorageFactory storage_factory;
+  StorageType storage_type;
   int fd_;
-  std::unordered_map<std::string, Storage> topic_to_storage_;
+  std::unordered_map<std::string, Topic> topics;
   int32_t handle_connection(int connfd);
 };
 

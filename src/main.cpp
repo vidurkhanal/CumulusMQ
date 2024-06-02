@@ -3,9 +3,13 @@
 #include <cstddef>
 
 int main() {
-  Memory memory;
+  Server::ServerConfig config = {
+      8080,
+  };
 
-  Server::ServerConfig config = {8080, (Storage *)&memory};
-  Server::Server server(config);
+  StorageFactory storage_factory = StorageFactory();
+  StorageType storage_type = StorageType::MemoryStorage;
+
+  Server::Server server(config, storage_factory, storage_type);
   server.Start();
 }

@@ -4,12 +4,21 @@
 #include <cstddef>
 #include <vector>
 
+enum StorageType { MemoryStorage };
+
 class Storage {
 public:
   Storage() {}          // Default constructor
   virtual ~Storage() {} // Virtual destructor
   virtual int Save(std::vector<std::byte>) = 0;
   virtual std::vector<std::byte> Fetch(int) = 0;
+};
+
+class StorageFactory {
+public:
+  StorageFactory() {}               // Default constructor
+  ~StorageFactory() {}              // Destructor
+  Storage *Build(StorageType type); // Create storage
 };
 
 class Memory : public Storage {
