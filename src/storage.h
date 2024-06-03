@@ -8,8 +8,6 @@ enum StorageType { MemoryStorage };
 
 class Storage {
 public:
-  Storage() {}          // Default constructor
-  virtual ~Storage() {} // Virtual destructor
   virtual int Save(std::vector<std::byte>) = 0;
   virtual std::vector<std::byte> Fetch(int) = 0;
 };

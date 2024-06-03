@@ -6,14 +6,14 @@
 
 class Topic {
 public:
-  Topic(const std::string &name, std::unique_ptr<Storage> storage);
+  Topic(const std::string &name, Storage *storage);
 
   void publish(const std::byte &message);
   void consume(const std::byte &message);
 
 private:
   std::string name;
-  std::unique_ptr<Storage> storage;
+  Storage *storage;
 };
 
 #endif // INCLUDE_SRC_TOPIC_H_
