@@ -1,4 +1,5 @@
 #include "topic.h"
+#include <cstdint>
 
 Topic::Topic(const std::string &name, Storage *storage)
     : name(name), storage(std::move(storage)) {}
@@ -6,10 +7,6 @@ Topic::Topic(const std::string &name, Storage *storage)
 /*
  * NOTE: The publish and consume methods are just placeholders.
  * */
-void Topic::publish(const std::byte &message) {
-  std::vector<std::byte> data;
-  data.push_back(message);
-  storage->Save(data);
-}
+void Topic::publish(std::vector<uint8_t> message) { storage->Save(message); }
 
-void Topic::consume(const std::byte &message) { storage->Fetch(0); }
+void Topic::consume() { storage->Fetch(0); }

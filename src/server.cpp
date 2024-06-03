@@ -95,7 +95,7 @@ static void state_res(Conn::Conn *conn) {
   }
 }
 
-static bool handle_conn(Conn::Conn *conn) {
+bool handle_connection(Conn::Conn *conn) {
   // try to parse a request from the buffer
   if (conn->rbuf_size < 4) {
     // not enough data in the buffer. Will retry in the next iteration
@@ -209,7 +209,7 @@ static bool try_fill_buffer(Conn::Conn *conn) {
 
   // Try to process requests one by one.
   // Why is there a loop? Please read the explanation of "pipelining".
-  while (handle_conn(conn)) {
+  while (handle_connection(conn)) {
   }
   return (conn->state == Conn::STATE_REQ);
 }
@@ -291,6 +291,19 @@ void Server::Start() {
       (void)Conn::accept_new_conn(fd2conn, fd_);
     }
   }
+}
+
+bool Server::CreateTopic(const std::string &topic_name) {
+  // Check if the topic already exists
+  if (topics.find(topic_name) != topics.end()) {
+    return false;
+  }
+
+  // Create a new topic
+  Storage *storage = storage_factory.Build(storage_type);
+  Topic topic(topic_name, storage);
+  topics[topic_name] = topic;
+  return true;
 }
 
 void die(const char *msg) {

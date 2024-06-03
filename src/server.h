@@ -4,7 +4,6 @@
 #include "storage.h"
 #include "topic.h"
 #include <arpa/inet.h>
-#include <cstdint>
 #include <netinet/ip.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -34,7 +33,7 @@ private:
   StorageType storage_type;
   int fd_;
   std::unordered_map<std::string, Topic> topics;
-  int32_t handle_connection(int connfd);
+  bool CreateTopic(const std::string &name);
 };
 
 } // namespace Server
