@@ -96,9 +96,7 @@ static void state_res(Conn::Conn *conn) {
 }
 
 bool handle_connection(Conn::Conn *conn) {
-  // try to parse a request from the buffer
   if (conn->rbuf_size < 4) {
-    // not enough data in the buffer. Will retry in the next iteration
     return false;
   }
 
@@ -115,7 +113,6 @@ bool handle_connection(Conn::Conn *conn) {
   ptr += 4;
 
   if (ptr + len > conn->rbuf_size) {
-    // not enough data in the buffer. Will retry in the next iteration
     return false;
   }
 
@@ -132,6 +129,11 @@ bool handle_connection(Conn::Conn *conn) {
 
   uint32_t topic_length = 0;
   memcpy(&topic_length, &conn->rbuf[ptr], 4);
+  if (topic_length > MAX_MESSAGE_SIZE - ptr) {
+    IOUtils::msg("invalid topic length");
+    conn->state = Conn::STATE_END;
+    return false;
+  }
   printf("Topic Length: %u\n", topic_length);
   ptr += 4;
 
@@ -143,34 +145,33 @@ bool handle_connection(Conn::Conn *conn) {
 
   uint32_t body_length = 0;
   memcpy(&body_length, &conn->rbuf[ptr], 4);
-  printf("body Length: %u\n", body_length);
+  if (body_length > MAX_MESSAGE_SIZE - ptr) {
+    IOUtils::msg("invalid body length");
+    conn->state = Conn::STATE_END;
+    return false;
+  }
+  printf("Body Length: %u\n", body_length);
   ptr += 4;
 
   char body_buf[body_length + 1];
   memcpy(&body_buf, &conn->rbuf[ptr], body_length);
-  topic_buf[body_length] = '\0';
+  body_buf[body_length] = '\0';
   printf("Body: %s\n", body_buf);
   ptr += body_length;
 
-  // generating echoing response
   memcpy(&conn->wbuf[0], &len, 4);
   memcpy(&conn->wbuf[4], &conn->rbuf[4], len);
   conn->wbuf_size = 4 + len;
 
-  // remove the request from the buffer.
-  // TODO: frequent memmove is inefficient.
-  // TODO: need better handling for production code.
   size_t remain = conn->rbuf_size - 4 - len;
   if (remain) {
     memmove(conn->rbuf, &conn->rbuf[4 + len], remain);
   }
   conn->rbuf_size = remain;
 
-  // change state
   conn->state = Conn::STATE_RES;
   state_res(conn);
 
-  // continue the outer loop if the request was fully processed
   return (conn->state == Conn::STATE_REQ);
 }
 
@@ -293,18 +294,18 @@ void Server::Start() {
   }
 }
 
-bool Server::CreateTopic(const std::string &topic_name) {
-  // Check if the topic already exists
-  if (topics.find(topic_name) != topics.end()) {
-    return false;
-  }
-
-  // Create a new topic
-  Storage *storage = storage_factory.Build(storage_type);
-  Topic topic(topic_name, storage);
-  topics[topic_name] = topic;
-  return true;
-}
+/* bool Server::CreateTopic(const std::string &topic_name) { */
+/*   // Check if the topic already exists */
+/*   if (topics.find(topic_name) != topics.end()) { */
+/*     return false; */
+/*   } */
+/**/
+/*   // Create a new topic */
+/*   Storage *storage = storage_factory.Build(storage_type); */
+/*   Topic topic(topic_name, storage); */
+/*   topics[topic_name] = topic; */
+/*   return true; */
+/* } */
 
 void die(const char *msg) {
   int err = errno;

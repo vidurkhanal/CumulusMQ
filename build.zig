@@ -15,20 +15,27 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const exe = b.addExecutable(.{ .name = "CumulusMQ", .target = target, .optimize = optimize, .root_source_file = .{
-        .path = "src/main.cpp",
-    } });
+    const exe = b.addExecutable(.{
+        .name = "CumulusMQ",
+        .target = target,
+        .optimize = optimize,
+    });
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
     // step when running `zig build`).
+
+    // exe.linkLibC();
+
+    const flags = [_][]const u8{
+        // unaligned access utilized, see C/CpuArch.h
+        "-std=c++17",
+    };
+    const source_files = [_][]const u8{ "src/main.cpp", "src/memory.cpp", "src/storage.cpp", "src/conn.cpp", "src/ioutils.cpp", "src/server.cpp", "src/topic.cpp" };
+    exe.addCSourceFiles(.{ .files = &source_files, .flags = &flags });
     exe.linkLibCpp();
+
     b.installArtifact(exe);
-
-    const cflags = [_][]const u8{ "-std=c++17", "-fno-sanitize=undefined" };
-    const source_files = [_][]const u8{ "src/main.cpp", "src/memory.cpp", "src/storage.cpp", "src/conn.cpp", "src/ioutils.cpp", "src/server.cpp", "src/topic.cpp", "src/storage.h", "src/ioutils.h", "src/conn.h", "src/server.h", "src/topic.h" };
-
-    exe.addCSourceFiles(.{ .files = &source_files, .flags = &cflags });
 
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
