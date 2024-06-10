@@ -1,5 +1,4 @@
 #include "utils.h"
-
 #include <cerrno>
 #include <cstdlib>
 #include <limits>

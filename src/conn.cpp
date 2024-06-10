@@ -1,5 +1,6 @@
 #include "conn.h"
 #include "ioutils.h"
+#include "server.h"
 #include <fcntl.h>
 
 namespace Conn {
