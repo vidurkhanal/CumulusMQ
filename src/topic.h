@@ -3,14 +3,13 @@
 #include "storage.h"
 #include <cstddef>
 #include <string>
-#include <vector>
 
 class Topic {
 public:
   Topic(const std::string &name, Storage *storage);
 
-  void publish(std::vector<uint8_t> message);
-  void consume();
+  void publish(const char *message);
+  const char *consume(int);
 
 private:
   std::string name;

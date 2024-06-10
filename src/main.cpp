@@ -11,5 +11,5 @@ int main() {
   StorageType storage_type = StorageType::MemoryStorage;
 
   Server::Server server(config, storage_factory, storage_type);
-  server.Start();
+  server.start();
 }

@@ -2,15 +2,14 @@
 #define STORAGE_H
 
 #include <cstddef>
-#include <cstdint>
 #include <vector>
 
 enum StorageType { MemoryStorage };
 
 class Storage {
 public:
-  virtual int Save(std::vector<uint8_t>) = 0;
-  virtual std::vector<uint8_t> Fetch(int) = 0;
+  virtual int Save(const char *) = 0;
+  virtual const char *Fetch(int) = 0;
 };
 
 class StorageFactory {
@@ -24,11 +23,11 @@ class Memory : public Storage {
 public:
   Memory();  // Constructor declaration
   ~Memory(); // Destructor declaration
-  int Save(std::vector<uint8_t>) override;
-  std::vector<uint8_t> Fetch(int) override;
+  int Save(const char *) override;
+  const char *Fetch(int) override;
 
 private:
-  std::vector<std::vector<uint8_t>> bucket; // Memory storage
+  std::vector<const char *> bucket; // Memory storage
 };
 
 #endif

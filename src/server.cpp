@@ -2,6 +2,7 @@
 #include "conn.h"
 #include "ioutils.h"
 #include "storage.h"
+#include "utils.h"
 #include <arpa/inet.h>
 #include <cassert>
 #include <cstdint>
@@ -14,6 +15,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <vector>
 
 namespace Server {
 
@@ -48,7 +50,7 @@ Server::Server(ServerConfig config, StorageFactory storage_factory,
   int val = 1;
   setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
 
-  // bind and store informations about the scoket
+  // bind and store information about the socket
   struct sockaddr_in addr = {};
   addr.sin_family = AF_INET;
   addr.sin_port = ntohs(config.port);
@@ -62,7 +64,7 @@ Server::Server(ServerConfig config, StorageFactory storage_factory,
   }
 }
 
-static bool try_flush_buffer(Conn::Conn *conn) {
+bool Server::tryFlushBuffer(Conn::Conn *conn) {
   ssize_t rv = 0;
   do {
     size_t remain = conn->wbuf_size - conn->wbuf_sent;
@@ -90,12 +92,101 @@ static bool try_flush_buffer(Conn::Conn *conn) {
   return true;
 }
 
-static void state_res(Conn::Conn *conn) {
-  while (try_flush_buffer(conn)) {
+void Server::stateRes(Conn::Conn *conn) {
+  while (tryFlushBuffer(conn)) {
   }
 }
 
-bool handle_connection(Conn::Conn *conn) {
+static void writeToBuffer(uint8_t *buf, std::string *msg) {}
+
+void Server::handleQuery(Actions action, const char *topic_name,
+                         const char *body, Conn::Conn *conn) {
+  switch (action) {
+  case Actions::Subscribe: {
+    bool created = createTopic(topic_name);
+    if (created) {
+      int msg_len = 2;
+      const char *msg = "OK";
+      memcpy(&conn->wbuf[0], &msg_len, 4);
+      memcpy(&conn->wbuf[4], &msg, msg_len);
+      conn->wbuf_size = 4 + msg_len;
+    } else {
+      int msg_len = 7;
+      const char *msg = "EXISTS";
+      memcpy(&conn->wbuf[0], &msg_len, 4);
+      memcpy(&conn->wbuf[4], &msg, msg_len);
+      conn->wbuf_size = 4 + msg_len;
+    }
+    break;
+  }
+  case Actions::Unsubscribe: {
+    bool deleted = deleteTopic(topic_name);
+    if (deleted) {
+      int msg_len = 2;
+      std::string msg = "OK";
+      memcpy(&conn->wbuf[0], &msg_len, 4);
+      memcpy(&conn->wbuf[4], &msg, msg_len);
+      conn->wbuf_size = 4 + msg_len;
+    } else {
+      int msg_len = 7;
+      const char *msg = "NOTFOUND";
+      memcpy(&conn->wbuf[0], &msg_len, 4);
+      memcpy(&conn->wbuf[4], &msg, msg_len);
+      conn->wbuf_size = 4 + msg_len;
+    }
+    break;
+  }
+  case Actions::Publish: {
+    try {
+      Topic *topic = getTopic(topic_name);
+      topic->publish(body);
+      std::string msg = "OK";
+      const int msg_len = static_cast<int>(msg.size());
+      memcpy(&conn->wbuf[0], &msg_len, 4);
+      memcpy(&conn->wbuf[4], msg.c_str(), msg_len);
+      conn->wbuf_size = 4 + msg_len;
+    } catch (std::runtime_error &e) {
+      const std::string msg = "NOTFOUND";
+      const int msg_len = static_cast<int>(msg.size());
+      memcpy(&conn->wbuf[0], &msg_len, 4);
+      memcpy(&conn->wbuf[4], msg.c_str(), msg_len);
+      conn->wbuf_size = 4 + msg_len;
+    }
+    break;
+  }
+  case Actions::Retrieve: {
+    try {
+      Topic *topic = getTopic(topic_name);
+      int offset = stringToInt(body);
+      const char *data = topic->consume(0);
+    } catch (std::runtime_error &e) {
+      const std::string msg = "NOTFOUND";
+      const int msg_len = static_cast<int>(msg.size());
+      memcpy(&conn->wbuf[0], &msg_len, 4);
+      memcpy(&conn->wbuf[4], msg.c_str(), msg_len);
+      conn->wbuf_size = 4 + msg_len;
+    } catch (std::invalid_argument &e) {
+      const std::string msg = "INVALID_OFFSET";
+      const int msg_len = static_cast<int>(msg.size());
+      memcpy(&conn->wbuf[0], &msg_len, 4);
+      memcpy(&conn->wbuf[4], msg.c_str(), msg_len);
+      conn->wbuf_size = 4 + msg_len;
+    } catch (std::out_of_range &e) {
+      const std::string msg = "OUT_OF_RANGE";
+      const int msg_len = static_cast<int>(msg.size());
+      memcpy(&conn->wbuf[0], &msg_len, 4);
+      memcpy(&conn->wbuf[4], msg.c_str(), msg_len);
+      conn->wbuf_size = 4 + msg_len;
+    }
+    break;
+  }
+  case Actions::Unknown:
+    // unreachable
+    break;
+  }
+}
+
+bool Server::handleConnection(Conn::Conn *conn) {
   if (conn->rbuf_size < 4) {
     return false;
   }
@@ -109,7 +200,7 @@ bool handle_connection(Conn::Conn *conn) {
     return false;
   }
 
-  printf("Message Length: %u\n", len);
+  /* printf("Message Length: %u\n", len); */
   ptr += 4;
 
   if (ptr + len > conn->rbuf_size) {
@@ -134,13 +225,14 @@ bool handle_connection(Conn::Conn *conn) {
     conn->state = Conn::STATE_END;
     return false;
   }
-  printf("Topic Length: %u\n", topic_length);
+  /* printf("Topic Length: %u\n", topic_length); */
   ptr += 4;
 
   char topic_buf[topic_length + 1];
   memcpy(&topic_buf, &conn->rbuf[ptr], topic_length);
   topic_buf[topic_length] = '\0';
-  printf("Topic: %s\n", topic_buf);
+  /* printf("Topic: %s\n", topic_buf); */
+
   ptr += topic_length;
 
   uint32_t body_length = 0;
@@ -150,14 +242,17 @@ bool handle_connection(Conn::Conn *conn) {
     conn->state = Conn::STATE_END;
     return false;
   }
-  printf("Body Length: %u\n", body_length);
+  /* printf("Body Length: %u\n", body_length); */
   ptr += 4;
 
   char body_buf[body_length + 1];
   memcpy(&body_buf, &conn->rbuf[ptr], body_length);
   body_buf[body_length] = '\0';
-  printf("Body: %s\n", body_buf);
+  /* printf("Body: %s\n", body_buf); */
+
   ptr += body_length;
+
+  handleQuery(action, topic_buf, body_buf, conn);
 
   memcpy(&conn->wbuf[0], &len, 4);
   memcpy(&conn->wbuf[4], &conn->rbuf[4], len);
@@ -170,12 +265,12 @@ bool handle_connection(Conn::Conn *conn) {
   conn->rbuf_size = remain;
 
   conn->state = Conn::STATE_RES;
-  state_res(conn);
+  stateRes(conn);
 
   return (conn->state == Conn::STATE_REQ);
 }
 
-static bool try_fill_buffer(Conn::Conn *conn) {
+bool Server::tryFillBuffer(Conn::Conn *conn) {
   // try to fill the buffer
   assert(conn->rbuf_size < sizeof(conn->rbuf));
   ssize_t rv = 0;
@@ -210,27 +305,27 @@ static bool try_fill_buffer(Conn::Conn *conn) {
 
   // Try to process requests one by one.
   // Why is there a loop? Please read the explanation of "pipelining".
-  while (handle_connection(conn)) {
+  while (handleConnection(conn)) {
   }
   return (conn->state == Conn::STATE_REQ);
 }
 
-static void state_req(Conn::Conn *conn) {
-  while (try_fill_buffer(conn)) {
+void Server::stateReq(Conn::Conn *conn) {
+  while (tryFillBuffer(conn)) {
   };
 }
 
-static void connection_io(Conn::Conn *conn) {
+void Server::connectionIO(Conn::Conn *conn) {
   if (conn->state == Conn::STATE_REQ) {
-    state_req(conn);
+    stateReq(conn);
   } else if (conn->state == Conn::STATE_RES) {
-    state_res(conn);
+    stateRes(conn);
   } else {
     assert(0); // not expected
   }
 }
 
-void Server::Start() {
+void Server::start() {
   int rv = listen(fd_, SOMAXCONN);
   if (rv) {
     die("listen()");
@@ -276,7 +371,7 @@ void Server::Start() {
     for (size_t i = 1; i < poll_args.size(); ++i) {
       if (poll_args[i].revents) {
         Conn::Conn *conn = fd2conn[poll_args[i].fd];
-        connection_io(conn);
+        connectionIO(conn);
         if (conn->state == Conn::STATE_END) {
           // client closed normally, or something bad happened.
           // destroy this connection
@@ -294,18 +389,30 @@ void Server::Start() {
   }
 }
 
-/* bool Server::CreateTopic(const std::string &topic_name) { */
-/*   // Check if the topic already exists */
-/*   if (topics.find(topic_name) != topics.end()) { */
-/*     return false; */
-/*   } */
-/**/
-/*   // Create a new topic */
-/*   Storage *storage = storage_factory.Build(storage_type); */
-/*   Topic topic(topic_name, storage); */
-/*   topics[topic_name] = topic; */
-/*   return true; */
-/* } */
+bool Server::createTopic(const char *topic_name) {
+  if (topics.find(topic_name) == topics.end()) {
+    Storage *storage = storage_factory.Build(storage_type);
+    Topic topic(topic_name, storage);
+    topics[topic_name] = &topic;
+    return true;
+  }
+  return false;
+}
+
+bool Server::deleteTopic(const char *topic_name) {
+  if (topics.find(topic_name) != topics.end()) {
+    topics.erase(topic_name);
+    return true;
+  }
+  return false;
+}
+
+Topic *Server::getTopic(const char *topic_name) {
+  if (topics.find(topic_name) != topics.end()) {
+    throw std::runtime_error("Topic not found");
+  }
+  return topics[topic_name];
+}
 
 void die(const char *msg) {
   int err = errno;

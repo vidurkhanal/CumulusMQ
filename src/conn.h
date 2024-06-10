@@ -1,9 +1,10 @@
 #ifndef CONN_H
 #define CONN_H
 
-#include "server.h"
+#include "constants.h"
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 namespace Conn {
 enum {
@@ -19,11 +20,11 @@ struct Conn {
   uint32_t state = 0; // either STATE_REQ or STATE_RES
   // buffer for reading
   size_t rbuf_size = 0;
-  uint8_t rbuf[4 + Server::MAX_MESSAGE_SIZE];
+  uint8_t rbuf[4 + MAX_MESSAGE_SIZE];
   // buffer for writing
   size_t wbuf_size = 0;
   size_t wbuf_sent = 0;
-  uint8_t wbuf[4 + Server::MAX_MESSAGE_SIZE];
+  uint8_t wbuf[4 + MAX_MESSAGE_SIZE];
 };
 
 void conn_put(std::vector<Conn *> &fd2conn, struct Conn *conn);
