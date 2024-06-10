@@ -2,22 +2,24 @@ BUILD_DIR = build
 EXECUTABLE = CumulusMQ
 ZIG_OUT_DIR = zig-out/bin
 
-
-build_executable:
+cmake_build:
 	cmake --build $(BUILD_DIR)
 
-clean:
+cmake_clean:
 	rm -rf ${BUILD_DIR}
 
-run:
+cmake_run:
 	./$(BUILD_DIR)/$(EXECUTABLE)
 
-gen_build:
+cmake_gen:
 	cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -B ${BUILD_DIR} -S .
 
-build_zig:
+zig_debug:
 	zig build -Doptimize=Debug --summary all
 
-run_zig:
+zig_release:
+	zig build --release=safe --summary all
+
+zig_run:
 	./$(ZIG_OUT_DIR)/$(EXECUTABLE)
 
