@@ -64,6 +64,16 @@ Server::Server(ServerConfig config, StorageFactory storage_factory,
   }
 }
 
+Server::~Server() {
+  // Close the server socket
+  close(fd_);
+
+  // Delete all the Topic objects
+  for (auto &pair : topics) {
+    delete pair.second;
+  }
+}
+
 bool Server::tryFlushBuffer(Conn::Conn *conn) {
   ssize_t rv = 0;
   do {
@@ -97,24 +107,22 @@ void Server::stateRes(Conn::Conn *conn) {
   }
 }
 
-static void writeToBuffer(uint8_t *buf, std::string *msg) {}
-
 void Server::handleQuery(Actions action, const char *topic_name,
                          const char *body, Conn::Conn *conn) {
   switch (action) {
   case Actions::Subscribe: {
     bool created = createTopic(topic_name);
     if (created) {
-      int msg_len = 2;
-      const char *msg = "OK";
+      std::string msg = "OK";
+      const int msg_len = static_cast<int>(msg.size());
       memcpy(&conn->wbuf[0], &msg_len, 4);
-      memcpy(&conn->wbuf[4], &msg, msg_len);
+      memcpy(&conn->wbuf[4], msg.c_str(), msg_len);
       conn->wbuf_size = 4 + msg_len;
     } else {
-      int msg_len = 7;
-      const char *msg = "EXISTS";
+      std::string msg = "EXISTS";
+      const int msg_len = static_cast<int>(msg.size());
       memcpy(&conn->wbuf[0], &msg_len, 4);
-      memcpy(&conn->wbuf[4], &msg, msg_len);
+      memcpy(&conn->wbuf[4], msg.c_str(), msg_len);
       conn->wbuf_size = 4 + msg_len;
     }
     break;
@@ -216,7 +224,7 @@ bool Server::handleConnection(Conn::Conn *conn) {
     return false;
   }
   ptr += 1;
-  printf("Action: %u\n", action);
+  /* printf("Action: %u\n", action); */
 
   uint32_t topic_length = 0;
   memcpy(&topic_length, &conn->rbuf[ptr], 4);
@@ -254,9 +262,9 @@ bool Server::handleConnection(Conn::Conn *conn) {
 
   handleQuery(action, topic_buf, body_buf, conn);
 
-  memcpy(&conn->wbuf[0], &len, 4);
-  memcpy(&conn->wbuf[4], &conn->rbuf[4], len);
-  conn->wbuf_size = 4 + len;
+  /* memcpy(&conn->wbuf[0], &len, 4); */
+  /* memcpy(&conn->wbuf[4], &conn->rbuf[4], len); */
+  /* conn->wbuf_size = 4 + len; */
 
   size_t remain = conn->rbuf_size - 4 - len;
   if (remain) {

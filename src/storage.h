@@ -10,6 +10,7 @@ class Storage {
 public:
   virtual int Save(const char *) = 0;
   virtual const char *Fetch(int) = 0;
+  virtual ~Storage() = 0;
 };
 
 class StorageFactory {
@@ -21,8 +22,8 @@ public:
 
 class Memory : public Storage {
 public:
-  Memory();  // Constructor declaration
-  ~Memory(); // Destructor declaration
+  Memory();           // Constructor declaration
+  ~Memory() override; // Destructor declaration
   int Save(const char *) override;
   const char *Fetch(int) override;
 

@@ -24,6 +24,7 @@ class Server {
 public:
   Server(ServerConfig config, StorageFactory storage_factory,
          StorageType storage_type);
+  ~Server();
   void start();
 
 private:

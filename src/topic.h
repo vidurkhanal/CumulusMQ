@@ -7,6 +7,7 @@
 class Topic {
 public:
   Topic(const std::string &name, Storage *storage);
+  ~Topic();
 
   void publish(const char *message);
   const char *consume(int);
