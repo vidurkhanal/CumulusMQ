@@ -8,3 +8,10 @@ Storage *StorageFactory::Build(StorageType type) {
   }
   return nullptr;
 }
+
+StorageType parseStorageType(const char *type) {
+  if (strcmp(type, "MemoryStorage") == 0) {
+    return MemoryStorage;
+  }
+  return MemoryStorage;
+}
