@@ -1,4 +1,4 @@
-#include "topic.h"
+#include <cumulusmq/topic.h>
 
 Topic::Topic(const std::string &name, Storage *storage)
     : name(name), storage(std::move(storage)) {}

@@ -2,6 +2,7 @@
 #define SERVER_H
 
 #include "conn.h"
+#include "env.h"
 #include "storage.h"
 #include "topic.h"
 #include <arpa/inet.h>
@@ -22,15 +23,14 @@ void die(const char *msg);
 
 class Server {
 public:
-  Server(ServerConfig config, StorageFactory storage_factory,
-         StorageType storage_type);
+  Server(ServerConfig config, StorageFactory storage_factory, Env *env);
   ~Server();
   void start();
 
 private:
   ServerConfig config;
   StorageFactory storage_factory;
-  StorageType storage_type;
+  Env *env;
   int fd_;
   std::unordered_map<const char *, Topic *> topics;
   Topic *getTopic(const char *name);

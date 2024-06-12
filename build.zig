@@ -11,6 +11,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    exe.addIncludePath(.{ .path = "include" });
+
     const flags = [_][]const u8{
         "-std=c++17",
         "-pedantic",

@@ -1,11 +1,11 @@
-#include "server.h"
-#include "conn.h"
-#include "ioutils.h"
-#include "storage.h"
-#include "utils.h"
 #include <arpa/inet.h>
 #include <cassert>
 #include <cstdint>
+#include <cumulusmq/conn.h>
+#include <cumulusmq/ioutils.h>
+#include <cumulusmq/server.h>
+#include <cumulusmq/storage.h>
+#include <cumulusmq/utils.h>
 #include <errno.h>
 #include <iostream>
 #include <netinet/ip.h>
@@ -34,10 +34,8 @@ static Actions get_action(uint8_t message_type) {
   }
 }
 
-Server::Server(ServerConfig config, StorageFactory storage_factory,
-               StorageType storage_type)
-    : config(config), storage_factory(storage_factory),
-      storage_type(storage_type) {
+Server::Server(ServerConfig config, StorageFactory storage_factory, Env *env)
+    : config(config), storage_factory(storage_factory), env(env) {
   fd_ = socket(AF_INET /* says use IPv4*/, SOCK_STREAM /*use TCP*/,
                0 /*use default protocol*/);
 
@@ -399,7 +397,7 @@ void Server::start() {
 
 bool Server::createTopic(const char *topic_name) {
   if (topics.find(topic_name) == topics.end()) {
-    Storage *storage = storage_factory.Build(storage_type);
+    Storage *storage = storage_factory.Build(env->storage_type);
     Topic topic(topic_name, storage);
     topics[topic_name] = &topic;
     return true;

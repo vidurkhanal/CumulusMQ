@@ -1,5 +1,5 @@
-#include "env.h"
-#include "storage.h"
+#include <cumulusmq/conn.h>
+#include <cumulusmq/env.h>
 
 void buildEnv(Env *env) {
   const char *storage_type = getenv("CUMULUS_STORAGE_TYPE");
